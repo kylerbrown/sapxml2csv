@@ -1,0 +1,48 @@
+#!/usr/bin/python
+
+# -*- mode: Python -*-
+
+import numpy as np
+import xml.etree.ElementTree as ET
+import pandas as pd
+import argparse
+import os.path
+
+def sap_xml_to_df(fname):
+    "returns a pandas dataframe from a xml filename"
+    tree = ET.parse(fname)
+    root = tree.getroot()
+    numcols = (int(child.text) for child in root if child.tag == "numcols").next()
+    numrows = (int(child.text) for child in root if child.tag == "numrows").next()
+    colnames = {int(child.attrib["ix"]): child.text
+                for child in root if child.tag == "colname"}
+    assert len(colnames) == numcols
+    data = np.zeros((numrows-1, numcols))
+    for i in colnames:
+        data[:,i-1] = [float(child.text) for child in root 
+                       if child.tag == "cell" 
+                       and "ix" in child.attrib
+                       and int(child.attrib["ix"])==i]
+    df = pd.DataFrame(data,columns=colnames.values())
+    return df
+
+
+def to_csv(dataframe, oldname):
+    name, ext = os.path.splitext(oldname)
+    dataframe.to_csv("{}.csv".format(name))
+
+
+def main(xmlfiles):
+
+    for fname in xmlfiles:
+        df = sap_xml_to_df(fname)
+        to_csv(df, fname)
+
+
+if __name__ == "__main__":
+    p = argparse.ArgumentParser(prog="sapxml2csv",
+                                description="Converts Sound Analysis Pro XML files to CSV files")
+    p.add_argument("xmlfiles", help="XML file(s)", nargs="+")
+    options = p.parse_args()
+
+    main(options.xmlfiles)
